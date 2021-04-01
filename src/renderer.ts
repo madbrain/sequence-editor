@@ -161,6 +161,15 @@ export class DiagramView {
         });
         return y;
     }
+
+    select(message: MessageView) {
+        this.messages.forEach(message => message.selected = false);
+        if (message) {
+            // TODO display tools
+            message.selected = true;
+        }
+    }
+    
 }
 
 export class PendingMessageView {
@@ -353,6 +362,7 @@ export class LifelineView {
 }
 
 export class MessageView {
+    
     model: MessageModel;
     from: MessageHandle;
     to: MessageHandle;

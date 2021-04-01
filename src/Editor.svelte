@@ -128,6 +128,9 @@ import { CommandStack } from './command';
             .select-marker.hover {
                 stroke: #55CCFF;
             }
+            .select-marker.selected {
+                stroke: #55CC99;
+            }
             .point-marker {
                 fill: none;
             }
@@ -164,7 +167,8 @@ import { CommandStack } from './command';
                 cx={message.from.center().x} cy={message.from.center().y} r="6" />
             <circle class="point-marker" class:hover={message.to.hover}
                 cx={message.to.center().x} cy={message.to.center().y} r="6" />
-            <rect class="select-marker" class:hover={message.hover} x={message.markerBounds.x} y={message.markerBounds.y}
+            <rect class="select-marker" class:hover={!message.selected && message.hover} class:selected={message.selected}
+                    x={message.markerBounds.x} y={message.markerBounds.y}
                     width={message.markerBounds.width} height={message.markerBounds.height}
                     rx="10" ry="10" fill="none" stroke-dasharray="4" stroke-width="2" />
         </g>

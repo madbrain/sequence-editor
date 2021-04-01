@@ -46,6 +46,8 @@ export class IdleState implements State {
     }
 
     mouseUp(event: Point): State {
+        this.context.view.select(null);
+        this.context.refresh(false);
         console.log("IDLE UP", event);
         return this;
     }
@@ -110,6 +112,8 @@ export class StartDragMessage implements State {
     }
 
     mouseUp(event: Point): State {
+        this.context.view.select(this.message);
+        this.context.refresh(false);
         return new IdleState(this.context);
     }
 
@@ -133,6 +137,7 @@ export class DragMessage implements State {
 
     mouseUp(event: Point): State {
         this.context.view.finishDragMessage(this.context.commandStack);
+        this.context.view.select(this.message);
         this.context.refresh(true); // TODO test command stack if need to refresh
         return new IdleState(this.context);
     }
