@@ -16,6 +16,11 @@ export class Point {
         const dy = this.y - other.y; 
         return Math.sqrt(dx*dx + dy*dy);
     }
+
+    move(dx: number, dy: number): Point {
+        return new Point(this.x + dx, this.y + dy);
+    }
+    
 }
 
 export class Rectangle {
@@ -37,4 +42,13 @@ export class Rectangle {
     center() {
         return new Point(this.x + this.width/2, this.y+this.height/2);
     }
+
+    topCenter() {
+        return new Point(this.x + this.width/2, this.y);
+    }
+    
+    topRight() {
+        return new Point(this.x + this.width, this.y);
+    }
+    
 }

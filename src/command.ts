@@ -5,7 +5,11 @@ export interface Command {
     redo();
 }
 
-export class CommandStack {
+export interface CommandExecuter {
+    execute(command: Command);
+}
+
+export class CommandStack implements CommandExecuter {
     private stack: Command[] = [];
     private current = -1;
 

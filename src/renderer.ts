@@ -1,6 +1,10 @@
-import { CommandStack } from "./command";
+import { CommandExecuter, CommandStack } from "./command";
 import { Point, Rectangle } from "./geometry";
-import { DiagramModel, LifeLineModel, MessageModel, MoveLifeLineCommand, MoveMessageCommand, SetMessageFromCommand, SetMessageToCommand } from "./model";
+import { ChangeLifeLineNameCommand, ChangeMessageTextCommand, DeleteLifeLineCommand, DeleteMessageCommand, DiagramModel,
+    LifeLineModel, MessageModel, MoveLifeLineCommand, MoveMessageCommand,
+    SetMessageFromCommand, SetMessageToCommand } from "./model";
+import { faTrashAlt, faEdit } from '@fortawesome/free-solid-svg-icons';
+import { DirectEdit } from "./states";
 
 export interface Style {
     lifeLineHeadTextSize: string;
@@ -19,6 +23,87 @@ export interface Measurer {
     measure(text: string, textSize: string): any;
 }
 
+export interface Tool {
+    icon: string;
+    action: (commandStack: CommandExecuter, context: any) => void;
+}
+
+class EditMessageTool implements Tool {
+    
+    icon = <string>faEdit.icon[4];
+    
+    action(commandStack: CommandExecuter, context: any) {
+        const { diagram, message, directEdit } = context;
+        const command: DirectEdit = { value: message.model.text, bounds: message.textBounds.expand(3) };
+        directEdit(command).then(value => {
+            commandStack.execute(new ChangeMessageTextCommand(message.model, value))
+        }, () => {});
+    }
+}
+
+class DeleteMessageTool implements Tool {
+    
+    icon = <string>faTrashAlt.icon[4];
+    
+    action(commandStack: CommandExecuter, context: any) {
+        const { diagram, message } = context;
+        commandStack.execute(new DeleteMessageCommand(diagram, message.model));
+    }
+
+}
+
+class EditLifeLineTool implements Tool {
+    
+    icon = <string>faEdit.icon[4];
+    
+    action(commandStack: CommandExecuter, context: any) {
+        const { diagram, lifeLine, directEdit } = context;
+        const command: DirectEdit = { value: lifeLine.model.name, bounds: lifeLine.textBounds.expand(3) };
+        directEdit(command).then(value => {
+            commandStack.execute(new ChangeLifeLineNameCommand(lifeLine.model, value))
+        }, () => {});
+    }
+}
+
+class DeleteLifeLineTool implements Tool {
+    
+    icon = <string>faTrashAlt.icon[4];
+    
+    action(commandStack: CommandExecuter, context: any) {
+        const { diagram, lifeLine } = context;
+        commandStack.execute(new DeleteLifeLineCommand(diagram, lifeLine.model));
+    }
+
+}
+
+export class PlacedTool {
+    
+    hover = false;
+    constructor(public bounds: Rectangle, public tool: Tool, public context: any) {}
+
+    testHover(mousePoint: Point): boolean {
+        let changed = false;
+        if (this.bounds.contains(mousePoint)) {
+            changed ||= this.setHover(true);
+        } else {
+            changed ||= this.setHover(false);
+        }
+        return changed;
+    }
+
+    setHover(value: boolean) {
+        if (this.hover != value) {
+            this.hover = value;
+            return true;
+        }
+        return false;
+    }
+
+    action(commandStack: CommandExecuter) {
+        this.tool.action(commandStack, this.context);
+    }
+}
+
 export class DiagramView {
     
     private messageStart = 0;
@@ -27,11 +112,23 @@ export class DiagramView {
     pendingDragMessage: PendingDragMessageView = null;
     pendingLifeLine: PendingLifeLineView = null;
 
+    tools: PlacedTool[] = [];
+
     constructor(public model: DiagramModel, private style: Style,
+        private measurer: Measurer,
         public lifeLines: LifelineView[], public messages: MessageView[]) { }
 
     testHover(event: Point) {
         let changed = false;
+        let toolHover = false;
+        this.tools.forEach(tool => {
+            changed ||= tool.testHover(event);
+            toolHover ||= tool.hover;
+        });
+        if (toolHover) {
+            this.clearOtherHover();
+            return changed;
+        }
         this.messages.forEach(message => {
             changed ||= message.testHover(event);
         });
@@ -39,6 +136,11 @@ export class DiagramView {
             changed ||= lifeLine.testHover(event);
         });
         return changed;
+    }
+
+    private clearOtherHover() {
+        this.messages.forEach(message => message.setHover(false));
+        this.lifeLines.forEach(lifeLine => lifeLine.setHover(false));
     }
 
     startPendingMessage(handle: MessageHandle, to: number) {
@@ -86,7 +188,6 @@ export class DiagramView {
         this.pendingLifeLine = null;
     }
     
-
     findMessageHandle(event: Point) {
         for (let message of this.messages) {
             if (message.from.bounds().contains(event)) {
@@ -107,7 +208,15 @@ export class DiagramView {
         return this.lifeLines.find(lifeLine => lifeLine.hoverBounds.contains(event));
     }
 
+    findTool(event: Point) {
+        return this.tools.find(tool => tool.bounds.contains(event));
+    }
+
     layout() {
+
+        this.lifeLines.forEach(lifeLine => lifeLine.measureText(this.measurer));
+        this.messages.forEach(message => message.measureText(this.measurer));
+
         this.messageStart = 0;
 
         this.lifeLines.forEach(lifeLine => {
@@ -162,12 +271,51 @@ export class DiagramView {
         return y;
     }
 
-    select(message: MessageView) {
-        this.messages.forEach(message => message.selected = false);
+    selectMessage(message: MessageView, directEdit: (DirectEdit) => Promise<string>) {
+        this.unselectAll();
         if (message) {
-            // TODO display tools
             message.selected = true;
+            const context = {
+                diagram: this.model,
+                message: message,
+                directEdit
+            };
+            this.placeTools(message.markerBounds.topCenter().move(0, -30), context, [
+                new EditMessageTool(),
+                new DeleteMessageTool(),
+            ]);
         }
+    }
+
+    selectLifeLine(lifeLine: LifelineView, directEdit: (DirectEdit) => Promise<string>) {
+        this.unselectAll();
+        if (lifeLine) {
+            lifeLine.selected = true;
+            const context = {
+                diagram: this.model,
+                lifeLine: lifeLine,
+                directEdit
+            };
+            this.placeTools(lifeLine.hoverBounds.topRight().move(5, 5), context, [
+                new EditLifeLineTool(),
+                new DeleteLifeLineTool()
+            ]);
+        }
+    }
+    
+    unselectAll() {
+        this.messages.forEach(message => message.selected = false);
+        this.lifeLines.forEach(lifeLine => lifeLine.selected = false);
+        this.tools = [];
+    }
+
+    placeTools(position: Point, context: any, tools: Tool[]) {
+        let current = position;
+        this.tools = tools.map(tool => {
+            const placedTool = new PlacedTool(current.rect(26, 26), tool, context);
+            current = current.move(30, 0);
+            return placedTool;
+        });
     }
     
 }
@@ -313,12 +461,8 @@ export class PendingLifeLineView {
 
 export class LifelineView {
 
-    model: LifeLineModel;
-    text: string;
-    index: number;
-    textSize: string;
+    text: TextView;
     width: number;
-    ascent: number;
     headHeight: number;
     lineHeight: number = 0;
     x: number = 0;
@@ -328,16 +472,10 @@ export class LifelineView {
 
     hoverBounds: Rectangle; // derived
     markerBounds: Rectangle; // derived
+    textBounds: Rectangle; // derived
+    textDy: number;
 
-    constructor(options) {
-        this.model = options.model;
-        this.text = options.text;
-        this.index = options.index;
-        this.textSize = options.textSize;
-        this.width = options.width;
-        this.ascent = options.ascent;
-        this.headHeight = options.headHeight;
-    }
+    constructor(public model: LifeLineModel, public index: number, private style: Style) { }
 
     centerX() {
         return this.x + this.width / 2;
@@ -355,7 +493,15 @@ export class LifelineView {
         return false;
     }
 
+    measureText(measurer: Measurer) {
+        this.text = new TextView(this.model.name, this.style.lifeLineHeadTextSize, TextAlign.CENTER, measurer);
+        this.headHeight = Math.max(this.text.height + this.style.lifeLineHeadMargin * 2, this.style.minHeadHeight);
+        this.width = this.text.width + this.style.lifeLineHeadMargin * 2;
+        this.textDy = this.style.lifeLineHeadMargin + this.text.ascent + 10;
+    }
+
     layout() {
+        this.textBounds = this.text.boundsAt(new Point(this.x + this.width/2, this.y).move(0, this.textDy));
         this.hoverBounds = new Point(this.x, this.y).rect(this.width, this.headHeight).expand(10);
         this.markerBounds = new Point(this.x, this.y).rect(this.width, this.headHeight + this.lineHeight).expand(10);
     }
@@ -363,32 +509,23 @@ export class LifelineView {
 
 export class MessageView {
     
-    model: MessageModel;
     from: MessageHandle;
     to: MessageHandle;
     reversed: boolean; // for text position
-    text: string;
-    textSize: string;
+    text: TextView;
     width: number;
-    ascent: number;
     height: number;
     selected: boolean = false;
     hover: boolean = false;
     markerBounds: Rectangle = null;
+    textBounds: Rectangle;
     y: number = 0;
     editing = false;
 
-    constructor(options) {
-        this.model = options.model;
-        this.from = new MessageHandle(options.from, this);
-        this.to = new MessageHandle(options.to, this);
+    constructor(public model: MessageModel, from: LifelineView, to: LifelineView, private style: Style) {
+        this.from = new MessageHandle(from, this);
+        this.to = new MessageHandle(to, this);
         this.reversed = this.from.lifeLine.index > this.to.lifeLine.index;
-        this.text = options.text;
-        this.textSize = options.textSize;
-        this.width = options.width;
-        this.ascent = options.ascent;
-        this.height = options.height;
-        this.selected = options.selected;
     }
 
     testHover(mousePoint: Point) {
@@ -413,12 +550,22 @@ export class MessageView {
         return false;
     }
 
+    measureText(measurer: Measurer) {
+        this.text = new TextView(this.model.text, this.style.messageTextSize,
+            this.reversed ? TextAlign.LEFT : TextAlign.RIGHT, measurer);
+        this.width = this.text.width;
+        this.height = this.text.height;
+    }
+
     layout() {
         this.markerBounds = new Rectangle(
             Math.min(this.from.lifeLine.centerX() - 10, this.to.lifeLine.centerX() - 10),
             this.y - this.height - 7,
             Math.abs(this.from.lifeLine.centerX() - this.to.lifeLine.centerX()) + 20,
             this.height + 20);
+        const textMargin = this.reversed ? this.style.messageMargin : - this.style.messageMargin;
+        this.textBounds = this.text.boundsAt(new Point(this.to.lifeLine.centerX(), this.y)
+            .move(textMargin, -7));
     }
 
     other(handle: MessageHandle) {
@@ -426,6 +573,36 @@ export class MessageView {
             return this.to;
         }
         return this.from;
+    }
+}
+
+export enum TextAlign {
+    LEFT,
+    CENTER,
+    RIGHT
+}
+
+export class TextView {
+    
+    width: number;
+    height: number;
+    ascent: number;
+
+    constructor(public value: string, public size: string, public align: TextAlign, measurer: Measurer) {
+        const metrics = measurer.measure(value, size);
+        this.width = metrics.width;
+        this.ascent = metrics.actualBoundingBoxAscent;
+        this.height = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent
+    }
+
+    boundsAt(p: Point): Rectangle {
+        if (this.align == TextAlign.RIGHT) {
+            return p.move(-this.width, -this.ascent).rect(this.width, this.height);
+        }
+        if (this.align == TextAlign.CENTER) {
+            return p.move(-this.width/2, -this.ascent).rect(this.width, this.height);
+        }
+        return p.move(0, -this.ascent).rect(this.width, this.height);
     }
 }
 
@@ -460,42 +637,25 @@ export class Renderer {
             lifeLineMap[lifeLine.model.id] = lifeLine;
         });
         const messages = model.messages.map(message => this.createMessage(message, lifeLineMap));
-        const view = new DiagramView(model, this.style, lifeLines, messages);
+        const view = new DiagramView(model, this.style, this.measurer, lifeLines, messages);
         view.layout();
 
         return view;
     }
 
     private createLifeline(lifeLine: LifeLineModel, index: number): LifelineView {
-        const metrics = this.measurer.measure(lifeLine.name, this.style.lifeLineHeadTextSize);
-        const headHeight = Math.max(metrics.actualBoundingBoxAscent
-            + metrics.actualBoundingBoxDescent + this.style.lifeLineHeadMargin * 2, this.style.minHeadHeight);
-        return new LifelineView({
-            model: lifeLine,
-            text: lifeLine.name,
-            index,
-            textSize: this.style.lifeLineHeadTextSize,
-            width: metrics.width + this.style.lifeLineHeadMargin * 2,
-            ascent: metrics.actualBoundingBoxAscent,
-            headHeight
-        });
+        return new LifelineView(lifeLine, index, this.style);
     }
 
     private createMessage(message: MessageModel, lifeLineMap: { [key: string]: LifelineView }): MessageView {
-        const metrics = this.measurer.measure(message.text, this.style.messageTextSize);
         const from = lifeLineMap[message.from.id];
         const to = lifeLineMap[message.to.id];
-        return new MessageView({
-            model: message,
+        return new MessageView(
+            message,
             from,
             to,
-            text: message.text,
-            textSize: this.style.messageTextSize,
-            width: metrics.width,
-            ascent: metrics.actualBoundingBoxAscent,
-            height: metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent,
-        });
+            this.style,
+        );
     }
-
 
 }

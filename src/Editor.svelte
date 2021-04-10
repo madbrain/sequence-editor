@@ -1,14 +1,20 @@
 <script>
     import { onMount } from 'svelte';
-import { CommandStack } from './command';
+    import Fa from 'svelte-fa';
+    import { faUndo, faRedo } from '@fortawesome/free-solid-svg-icons';
+    import { CommandStack } from './command';
     import { Point } from './geometry';
     import { createModel, createLifeLine, createMessage, AddLifeLineCommand, AddMessageCommand } from './model';
     import { Renderer } from './renderer';
     import { DiagramContext, IdleState } from './states';
+    import DirectEdit from "./DirectEdit.svelte";
 
     let width;
     let height;
     let context;
+
+    let directEditComponent;
+    let currentEditDefer;
 
     let model;
     let commandStack;
@@ -19,6 +25,7 @@ import { CommandStack } from './command';
     let view = {
         lifeLines: [],
         messages: [],
+        tools: [],
         pendingMessage: null
     };
     let paletteState = {
@@ -39,6 +46,16 @@ import { CommandStack } from './command';
         messageMargin: 15
     };
 
+    function defer() {
+        const deferred = {};
+        const promise = new Promise((resolve, reject) => {
+            deferred.resolve = resolve;
+            deferred.reject  = reject;
+        });
+        deferred.promise = promise;
+        return deferred;
+    }
+
     onMount(() => {
         const canvas = document.createElement("canvas");
         context = canvas.getContext("2d");
@@ -57,12 +74,25 @@ import { CommandStack } from './command';
                 canUndo: commandStack.canUndo(),
                 canRedo: commandStack.canRedo()
             };
-        });
+        },
+        (directEdit) => {
+            currentEditDefer = defer();
+            directEditComponent.start(directEdit)
+            return currentEditDefer.promise;
+         });
         
         state = new IdleState(diagramContext);
 
         diagramContext.refresh(true);
     });
+
+    function changeDirectEdit(e) {
+        if (e.detail.status) {
+            currentEditDefer.resolve(e.detail.text);
+        } else {
+            currentEditDefer.reject({});
+        }
+    }
     
     function measureText(text, textSize) {
         context.font = textSize + " arial";
@@ -137,18 +167,24 @@ import { CommandStack } from './command';
             .point-marker.hover {
                 fill: #55CCFF;
             }
+            .tool rect {
+                stroke: #CCCCCC;
+            }
+            .tool.hover rect {
+                stroke: #55CCFF;
+            }
         </style>
         {#each view.lifeLines as lifeLine}
         <g transform="translate({lifeLine.x},{lifeLine.y})">
             <rect width="{lifeLine.width}" height="{lifeLine.headHeight}" stroke="black" fill="none"/>
-            <text dx={lifeLine.width/2} dy={lifeLine.headHeight/2+10} text-anchor="middle" font-size="{lifeLine.textSize}">{lifeLine.text}</text>
+            <text dx={lifeLine.width/2} dy={lifeLine.textDy} text-anchor="middle" font-size="{lifeLine.text.size}">{lifeLine.text.value}</text>
             <line x1={lifeLine.width/2} y1={lifeLine.headHeight}
                 x2={lifeLine.width/2} y2={lifeLine.headHeight + lifeLine.lineHeight}
                 stroke-dasharray="4"
                 stroke="black"/>
-            <rect class="select-marker" class:hover={lifeLine.hover} x={-10} y={-10}
+            <rect class="select-marker" class:hover={!lifeLine.selected && lifeLine.hover} class:selected={lifeLine.selected}
+                    x={-10} y={-10} rx="10" ry="10"
                     width={lifeLine.markerBounds.width} height={lifeLine.markerBounds.height}
-                    rx="10" ry="10"
                     fill="none" stroke-dasharray="4" stroke-width="2"/>
         </g>
         {/each}
@@ -159,9 +195,9 @@ import { CommandStack } from './command';
             <line x1={message.from.lifeLine.centerX()} y1={message.y}
                 x2={message.to.lifeLine.centerX()} y2={message.y} stroke="black" marker-end="url(#triangle)"/>
             {#if message.reversed}
-            <text x={message.to.lifeLine.centerX()+style.messageMargin} y={message.y-7} text-anchor="start" font-size="{message.textSize}">{message.text}</text>
+            <text x={message.to.lifeLine.centerX()+style.messageMargin} y={message.y-7} text-anchor="start" font-size="{message.text.size}">{message.text.value}</text>
             {:else}
-            <text x={message.to.lifeLine.centerX()-style.messageMargin} y={message.y-7} text-anchor="end" font-size="{message.textSize}">{message.text}</text>
+            <text x={message.to.lifeLine.centerX()-style.messageMargin} y={message.y-7} text-anchor="end" font-size="{message.text.size}">{message.text.value}</text>
             {/if}
             <circle class="point-marker" class:hover={message.from.hover}
                 cx={message.from.center().x} cy={message.from.center().y} r="6" />
@@ -188,15 +224,24 @@ import { CommandStack } from './command';
             stroke-width={view.pendingLifeLine.snap ? 3 : 1}
             stroke={view.pendingLifeLine.snap ? "green" : "#55CCFF"}/>
         {/if}
+        {#each view.tools as tool}
+            <g transform="translate({tool.bounds.x},{tool.bounds.y})" class="tool" class:hover={tool.hover}>
+                <rect rx="5" ry="5" width={tool.bounds.width} height={tool.bounds.height} fill="white"></rect>
+                <g transform="translate(4,3) scale({20.0/512})">
+                    <path d={tool.tool.icon} />
+                </g>
+            </g>
+        {/each}
     </svg>
     </div>
+    <DirectEdit bind:this={directEditComponent} on:change={changeDirectEdit} />
     <div class="palette">
         <ul>
             <li>
-                <button disabled={!paletteState.canUndo} on:click={undoAction}>Undo</button>
+                <button disabled={!paletteState.canUndo} on:click={undoAction} title="Undo"><Fa icon={faUndo}/></button>
             </li>
             <li>
-                <button disabled={!paletteState.canRedo} on:click={redoAction}>Redo</button>
+                <button disabled={!paletteState.canRedo} on:click={redoAction} title="Redo"><Fa icon={faRedo}/></button>
             </li>
             <li class="spacer">
                 <button on:click={addLifeLineAction}>Add LifeLine</button>

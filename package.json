@@ -10,7 +10,9 @@
   "author": "Ludovic L'Hours",
   "license": "ISC",
   "dependencies": {
-    "svelte": "^3.35.0"
+    "@fortawesome/free-solid-svg-icons": "^5.15.3",
+    "svelte": "^3.35.0",
+    "svelte-fa": "^2.2.0"
   },
   "devDependencies": {
     "copy-webpack-plugin": "^5.1.2",
