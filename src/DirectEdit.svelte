@@ -3,6 +3,7 @@
 
     const dispatcher = createEventDispatcher();
 
+    let inputEl;
     let opened = false;
     let inputValue = "";
     let x = 0;
@@ -43,8 +44,10 @@
     }
 
     function mouseUp(ev) {
-        dispatcher("change", { status: false, text: "" });
-        close();
+        if (ev.target !== inputEl) {
+            dispatcher("change", { status: false, text: "" });
+            close();
+        }
     }
 </script>
 
@@ -52,6 +55,7 @@
     <div class="directEdit" on:mouseup={mouseUp}>
         <input
             bind:value={inputValue}
+            bind:this={inputEl}
             style="left: {x}px; top: {y}px; width: {w}px; height: {h}px"
             type="text"
             use:initInput
@@ -73,5 +77,6 @@
     .directEdit input {
         position: absolute;
         border: solid 1px gray;
+        outline: none;
     }
 </style>

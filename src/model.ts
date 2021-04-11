@@ -74,14 +74,18 @@ export class AddLifeLineCommand implements Command {
 }
 
 export class AddMessageCommand implements Command {
-    constructor(private model: DiagramModel, private message: MessageModel) {}
+    constructor(private model: DiagramModel, private message: MessageModel, private position: number = -1) {
+        if (position < 0) {
+            this.position = model.messages.length;
+        }
+    }
 
     execute() {
-        this.model.messages.push(this.message);
+        this.model.messages.splice(this.position, 0, this.message);
     }
 
     undo() {
-        this.model.messages.pop();
+        this.model.messages.splice(this.position, 1);
     }
 
     redo() {
@@ -220,22 +224,52 @@ export class DeleteLifeLineCommand implements Command {
 let id = 0;
 
 export function createModel(): DiagramModel {
-    const lifeLines = new Array(5).fill(0).map(x => createLifeLine());
-    const messages = new Array(7).fill(0).map(x => createMessage(lifeLines));
+    const lifeLines = [
+        createLifeLine("Roméo"),
+        createLifeLine("Juliette"),
+    ];
+    return {
+        lifeLines,
+        messages: [
+            createMessage(lifeLines[0], lifeLines[1], "Je t'aime"),
+            createMessage(lifeLines[1], lifeLines[0], "Moi non plus"),
+        ]
+    };
+}
+
+export function createRandomModel(): DiagramModel {
+    const lifeLines = new Array(5).fill(0).map(x => createRandomLifeLine());
+    const messages = new Array(7).fill(0).map(x => createRandomMessage(lifeLines));
     return {
         lifeLines,
         messages
     };
 }
 
-export function createLifeLine(): LifeLineModel {
+export function createLifeLine(name: string = "actor"): LifeLineModel {
+    return {
+        id: `L${id++}`,
+        name
+    };
+}
+
+export function createMessage(from: LifeLineModel, to: LifeLineModel, text: string = "message"): MessageModel {
+    return {
+        id: `M${id++}`,
+        from,
+        to,
+        text
+    };
+}
+
+function createRandomLifeLine(): LifeLineModel {
     return {
         id: `L${id++}`,
         name: randomText(4)
     };
 }
 
-export function createMessage(lifeLines: LifeLineModel[]): MessageModel {
+function createRandomMessage(lifeLines: LifeLineModel[]): MessageModel {
     const from = choice(lifeLines);
     const to = choiceNot(from, lifeLines);
     return {

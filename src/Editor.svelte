@@ -4,7 +4,7 @@
     import { faUndo, faRedo } from '@fortawesome/free-solid-svg-icons';
     import { CommandStack } from './command';
     import { Point } from './geometry';
-    import { createModel, createLifeLine, createMessage, AddLifeLineCommand, AddMessageCommand } from './model';
+    import { createModel, createLifeLine, AddLifeLineCommand } from './model';
     import { Renderer } from './renderer';
     import { DiagramContext, IdleState } from './states';
     import DirectEdit from "./DirectEdit.svelte";
@@ -46,6 +46,7 @@
         messageMargin: 15
     };
 
+    // TODO move to utils
     function defer() {
         const deferred = {};
         const promise = new Promise((resolve, reject) => {
@@ -130,13 +131,6 @@
         diagramContext.refresh(true);
     }
 
-    function addMessageAction() {
-        if (model.lifeLines.length >= 2) {
-            commandStack.execute(new AddMessageCommand(model, createMessage(model.lifeLines)));
-            diagramContext.refresh(true);
-        }
-    }
-
 </script>
 
 <div class="container" bind:clientWidth={width} bind:clientHeight={height}>
@@ -210,6 +204,9 @@
         </g>
         {/if}
         {/each}
+        {#if view.startMessageHandle}
+        <circle class="point-marker hover" cx={view.startMessageHandle.position.x} cy={view.startMessageHandle.position.y} r="6" />
+        {/if}
         {#if view.pendingMessage}
         <line x1={view.pendingMessage.from} y1={view.pendingMessage.y}
                 x2={view.pendingMessage.to} y2={view.pendingMessage.y} fill="none" stroke="black" marker-end="url(#triangle)" />
@@ -245,9 +242,6 @@
             </li>
             <li class="spacer">
                 <button on:click={addLifeLineAction}>Add LifeLine</button>
-            </li>
-            <li>
-                <button on:click={addMessageAction}>Add Message</button>
             </li>
         </ul>
     </div>

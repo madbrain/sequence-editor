@@ -1,6 +1,6 @@
 import { CommandExecuter, CommandStack } from "./command";
 import { Point, Rectangle } from "./geometry";
-import { ChangeLifeLineNameCommand, ChangeMessageTextCommand, DeleteLifeLineCommand, DeleteMessageCommand, DiagramModel,
+import { AddMessageCommand, ChangeLifeLineNameCommand, ChangeMessageTextCommand, createMessage, DeleteLifeLineCommand, DeleteMessageCommand, DiagramModel,
     LifeLineModel, MessageModel, MoveLifeLineCommand, MoveMessageCommand,
     SetMessageFromCommand, SetMessageToCommand } from "./model";
 import { faTrashAlt, faEdit } from '@fortawesome/free-solid-svg-icons';
@@ -108,9 +108,10 @@ export class DiagramView {
     
     private messageStart = 0;
 
+    private pendingDragMessage: PendingDragMessageView = null; // not displayed
     pendingMessage: PendingMessageView = null;
-    pendingDragMessage: PendingDragMessageView = null;
     pendingLifeLine: PendingLifeLineView = null;
+    startMessageHandle: StartMessageHandleView = null;
 
     tools: PlacedTool[] = [];
 
@@ -120,22 +121,53 @@ export class DiagramView {
 
     testHover(event: Point) {
         let changed = false;
-        let toolHover = false;
+        let isHoverTool = false;
         this.tools.forEach(tool => {
             changed ||= tool.testHover(event);
-            toolHover ||= tool.hover;
+            isHoverTool ||= tool.hover;
         });
-        if (toolHover) {
+        if (isHoverTool) {
             this.clearOtherHover();
             return changed;
         }
-        this.messages.forEach(message => {
-            changed ||= message.testHover(event);
-        });
         this.lifeLines.forEach(lifeLine => {
             changed ||= lifeLine.testHover(event);
         });
+        let isHoverMessage = false;
+        this.messages.forEach(message => {
+            changed ||= message.testHover(event);
+            isHoverMessage ||= message.hover;
+        });
+        if (!isHoverMessage) {
+            changed ||= this.testHoverInsertMessage(event);
+        } else {
+            changed ||= this.clearStartMessage();
+        }
         return changed;
+    }
+
+    private testHoverInsertMessage(event: Point): boolean {
+        let isHoverStart = false;
+        let changed = false;
+        this.lifeLines.forEach(lifeLine => {
+            if (lifeLine.isNearLine(event)) {
+                this.startMessageHandle = new StartMessageHandleView(lifeLine, new Point(lifeLine.centerX(), event.y));
+                changed = true;
+                isHoverStart = true;
+            }
+        });
+        if (!isHoverStart) {
+            changed ||= this.clearStartMessage();
+        }
+        return changed;
+    }
+
+    private clearStartMessage(): boolean {
+        if (this.startMessageHandle) {
+            this.startMessageHandle = null;
+            return true;
+        }
+        return false;
     }
 
     private clearOtherHover() {
@@ -143,11 +175,16 @@ export class DiagramView {
         this.lifeLines.forEach(lifeLine => lifeLine.setHover(false));
     }
 
-    startPendingMessage(handle: MessageHandle, to: number) {
-        this.pendingMessage = new PendingMessageView(handle, to);
+    startDragMessageHandle(handle: MessageHandle, to: number) {
+        this.pendingMessage = new PendingExistingMessageView(handle, to);
     }
 
-    updatePendingMessage(x: number) {
+    startDragNewMessageHandle(to: number) {
+        this.pendingMessage = new PendingNewMessageView(this, this.startMessageHandle.lifeLine, this.startMessageHandle.position.y, to);
+        this.clearStartMessage();
+    }
+
+    updateDragMessageHandle(x: number) {
         this.pendingMessage.setPosition(x);
         this.pendingMessage.hoverOther = null;
         this.lifeLines.forEach(lifeline => {
@@ -157,7 +194,7 @@ export class DiagramView {
         });
     }
 
-    finishPendingMessage(commandStack: CommandStack) {
+    finishDragMessageHandle(commandStack: CommandStack) {
         this.pendingMessage.finish(commandStack);
         this.pendingMessage = null;
     }
@@ -309,7 +346,7 @@ export class DiagramView {
         this.tools = [];
     }
 
-    placeTools(position: Point, context: any, tools: Tool[]) {
+    private placeTools(position: Point, context: any, tools: Tool[]) {
         let current = position;
         this.tools = tools.map(tool => {
             const placedTool = new PlacedTool(current.rect(26, 26), tool, context);
@@ -320,30 +357,28 @@ export class DiagramView {
     
 }
 
-export class PendingMessageView {
+export class StartMessageHandleView {
+    constructor(public lifeLine: LifelineView, public position: Point) {}
+}
+
+export abstract class PendingMessageView {
 
     from: number;
     to: number;
-    y: number;
-    otherHandle: MessageHandle;
     hoverOther: LifelineView = null;
 
-    constructor(private handle: MessageHandle, pos: number) {
-        this.y = handle.message.y;
-        this.otherHandle = handle.message.other(handle);
-        if (handle == handle.message.from) {
-            this.from = pos;
-            this.to = this.otherHandle.lifeLine.centerX();
+    constructor(public y: number, movingPoint: number, protected lifeLine: LifelineView, private isMovingFrom: boolean) {
+        if (isMovingFrom) {
+            this.from = movingPoint;
+            this.to = lifeLine.centerX();
         } else {
-            this.from = this.otherHandle.lifeLine.centerX();
-            this.to = pos;
+            this.from = lifeLine.centerX();
+            this.to = movingPoint;
         }
-        this.handle.setHover(false);
-        this.handle.message.editing = true;
     }
 
     setPosition(pos: number) {
-        if (this.handle == this.handle.message.from) {
+        if (this.isMovingFrom) {
             this.from = pos;
         } else {
             this.to = pos;
@@ -351,7 +386,7 @@ export class PendingMessageView {
     }
 
     setHover(lifeline: LifelineView, pos: number) {
-        if (lifeline != this.otherHandle.lifeLine) {
+        if (lifeline != this.lifeLine) {
             this.hoverOther = lifeline;
             this.setPosition(this.hoverOther.centerX());
         } else {
@@ -360,14 +395,47 @@ export class PendingMessageView {
         }
     }
 
+    abstract finish(commandStack: CommandStack);
+    
+}
+
+export class PendingExistingMessageView extends PendingMessageView {
+
+    constructor(private handle: MessageHandle, pos: number) {
+        super(handle.message.y, pos, handle.message.other(handle).lifeLine, handle == handle.message.from);
+        this.handle.setHover(false);
+        this.handle.message.editing = true;
+    }
+
     finish(commandStack: CommandStack) {
         this.handle.message.editing = false;
-        if (this.hoverOther != null && this.hoverOther != this.otherHandle.lifeLine) {
+        if (this.hoverOther != null && this.hoverOther != this.lifeLine) {
             if (this.handle.message.from == this.handle) {
                 commandStack.execute(new SetMessageFromCommand(this.handle.message.model, this.hoverOther.model));
             } else {
                 commandStack.execute(new SetMessageToCommand(this.handle.message.model, this.hoverOther.model));
             }
+        }
+    }
+}
+
+export class PendingNewMessageView extends PendingMessageView {
+
+    constructor(private diagram: DiagramView, lifeLine: LifelineView, y: number, pos: number) {
+        super(y, pos, lifeLine, false);
+    }
+
+    finish(commandStack: CommandStack) {
+        if (this.hoverOther != null && this.hoverOther != this.lifeLine) {
+            let position = 0;
+            for (let message of this.diagram.messages) {
+                if (this.y <= message.markerBounds.y) {
+                    break;
+                }
+                ++position;
+            }
+            commandStack.execute(new AddMessageCommand(this.diagram.model,
+                createMessage(this.lifeLine.model, this.hoverOther.model), position));
         }
     }
 }
@@ -476,6 +544,11 @@ export class LifelineView {
     textDy: number;
 
     constructor(public model: LifeLineModel, public index: number, private style: Style) { }
+
+    isNearLine(event: Point) {
+        return Math.abs(this.centerX() - event.x) < 10
+            && (this.y + this.headHeight) < event.y  && event.y < (this.y + this.headHeight + this.lineHeight);
+    }
 
     centerX() {
         return this.x + this.width / 2;

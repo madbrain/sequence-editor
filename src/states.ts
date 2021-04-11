@@ -52,14 +52,17 @@ export class IdleState implements State {
         if (lifeLine) {
             return new StartDragLifeLine(this.context, event, lifeLine);
         }
-        console.log("IDLE DOWN", event);
+        if (this.context.view.startDragMessageHandle) {
+            this.context.view.startDragNewMessageHandle(event.x);
+            this.context.refresh(false);
+            return new DragHandle(this.context);
+        }
         return this;
     }
 
     mouseUp(event: Point): State {
         this.context.view.unselectAll();
         this.context.refresh(false);
-        console.log("IDLE UP", event);
         return this;
     }
 
@@ -112,7 +115,9 @@ export class StartDragHandle implements State {
 
     mouseMove(event: Point): State {
         if (event.distance(this.startDrag) > 10) {
-            return new DragHandle(this.context, event, this.handle);
+            this.context.view.startDragMessageHandle(this.handle, event.x);
+            this.context.refresh(false);
+            return new DragHandle(this.context);
         }
         return this;
     }
@@ -120,23 +125,20 @@ export class StartDragHandle implements State {
 }
 
 export class DragHandle implements State {
-    constructor(private context: DiagramContext, private dragPoint: Point, private handle: MessageHandle) {
-        this.context.view.startPendingMessage(handle, dragPoint.x);
-        this.context.refresh(false);
-    }
+    constructor(private context: DiagramContext) {}
 
     mouseDown(event: Point): State {
         return this;
     }
 
     mouseUp(event: Point): State {
-        this.context.view.finishPendingMessage(this.context.commandStack);
+        this.context.view.finishDragMessageHandle(this.context.commandStack);
         this.context.refresh(true); // TODO test command stack if need to refresh
         return new IdleState(this.context);
     }
 
     mouseMove(event: Point): State {
-        this.context.view.updatePendingMessage(event.x);
+        this.context.view.updateDragMessageHandle(event.x);
         this.context.refresh(false);
         return this;
     }
