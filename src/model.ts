@@ -195,6 +195,7 @@ export class MoveLifeLineCommand implements Command {
 export class DeleteLifeLineCommand implements Command {
     private oldPosition: number;
     private removedMessages: { message: MessageModel, position: number }[];
+    
     constructor(private model: DiagramModel, private lifeLine: LifeLineModel) {
         this.removedMessages = model.messages
             .map((message, i) => ({ message, position: i }))

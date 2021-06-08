@@ -1,7 +1,6 @@
 import { Command, CommandStack } from "./command";
 import { Point, Rectangle } from "./geometry";
-import { DiagramModel } from "./model";
-import { DiagramView, LifelineView, MessageHandle, MessageView, PlacedTool, Renderer, Tool } from "./renderer";
+import { DiagramView, LifelineView, MessageHandle, MessageView, PlacedTool } from "./renderer";
 
 export interface DirectEdit {
     bounds: Rectangle;
@@ -10,19 +9,16 @@ export interface DirectEdit {
 
 export class DiagramContext {
 
-    view: DiagramView;
-
     constructor(public commandStack: CommandStack,
-            private model: DiagramModel,
-            private renderer: Renderer,
-            private refreshCallback: (view: DiagramView) => void,
+            public view: DiagramView,
             public directEdit: (command: DirectEdit) => Promise<string>) {}
     
     refresh(doRender: boolean) {
-        if (doRender) {
-            this.view = this.renderer.render(this.model)
-        }
-        this.refreshCallback(this.view);
+        // if (doRender) {
+        //     this.view.render();
+        // } else {
+        //     this.view.update();
+        // }
     }
 }
 
@@ -52,9 +48,8 @@ export class IdleState implements State {
         if (lifeLine) {
             return new StartDragLifeLine(this.context, event, lifeLine);
         }
-        if (this.context.view.startDragMessageHandle) {
+        if (this.context.view.startMessageHandle) {
             this.context.view.startDragNewMessageHandle(event.x);
-            this.context.refresh(false);
             return new DragHandle(this.context);
         }
         return this;
@@ -62,14 +57,12 @@ export class IdleState implements State {
 
     mouseUp(event: Point): State {
         this.context.view.unselectAll();
-        this.context.refresh(false);
+        this.context.view.update();
         return this;
     }
 
     mouseMove(event: Point): State {
-        if (this.context.view.testHover(event)) {
-            this.context.refresh(false);
-        }
+        this.context.view.testHover(event);
         return this;
     }
     
@@ -116,7 +109,6 @@ export class StartDragHandle implements State {
     mouseMove(event: Point): State {
         if (event.distance(this.startDrag) > 10) {
             this.context.view.startDragMessageHandle(this.handle, event.x);
-            this.context.refresh(false);
             return new DragHandle(this.context);
         }
         return this;
@@ -133,13 +125,11 @@ export class DragHandle implements State {
 
     mouseUp(event: Point): State {
         this.context.view.finishDragMessageHandle(this.context.commandStack);
-        this.context.refresh(true); // TODO test command stack if need to refresh
         return new IdleState(this.context);
     }
 
     mouseMove(event: Point): State {
         this.context.view.updateDragMessageHandle(event.x);
-        this.context.refresh(false);
         return this;
     }
 }
@@ -153,7 +143,6 @@ export class StartDragMessage implements State {
 
     mouseUp(event: Point): State {
         this.context.view.selectMessage(this.message, this.context.directEdit);
-        this.context.refresh(false);
         return new IdleState(this.context);
     }
 
@@ -168,7 +157,6 @@ export class StartDragMessage implements State {
 export class DragMessage implements State {
     constructor(private context: DiagramContext, private dragPoint: Point, private message: MessageView) {
         this.context.view.startDragMessage(message, dragPoint.y);
-        this.context.refresh(false);
     }
 
     mouseDown(event: Point): State {
@@ -178,14 +166,12 @@ export class DragMessage implements State {
     mouseUp(event: Point): State {
         this.context.view.finishDragMessage(this.context.commandStack);
         this.context.view.selectMessage(this.message, this.context.directEdit);
-        this.context.refresh(true); // TODO test command stack if need to refresh
         return new IdleState(this.context);
     }
 
     mouseMove(event: Point): State {
         this.context.view.updateDragMessage(event.y);
         removeTextSelection();
-        this.context.refresh(false);
         return this;
     }
 }
@@ -199,7 +185,6 @@ export class StartDragLifeLine implements State {
 
     mouseUp(event: Point): State {
         this.context.view.selectLifeLine(this.lifeLine, this.context.directEdit);
-        this.context.refresh(false);
         return new IdleState(this.context);
     }
 
@@ -214,7 +199,6 @@ export class StartDragLifeLine implements State {
 export class DragLifeLine implements State {
     constructor(private context: DiagramContext, private dragPoint: Point, private lifeLine: LifelineView) {
         this.context.view.startDragLifeLine(this.lifeLine, dragPoint.x);
-        this.context.refresh(false);
     }
 
     mouseDown(event: Point): State {
@@ -224,14 +208,12 @@ export class DragLifeLine implements State {
     mouseUp(event: Point): State {
         this.context.view.finishDragLifeLine(this.context.commandStack);
         this.context.view.selectLifeLine(this.lifeLine, this.context.directEdit);
-        this.context.refresh(true); // TODO test command stack if need to refresh
         return new IdleState(this.context);
     }
 
     mouseMove(event: Point): State {
         this.context.view.updateDragLifeLine(event.x);
         removeTextSelection();
-        this.context.refresh(false);
         return this;
     }
 }
