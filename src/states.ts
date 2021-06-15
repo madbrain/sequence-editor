@@ -8,18 +8,7 @@ export interface DirectEdit {
 }
 
 export class DiagramContext {
-
-    constructor(public commandStack: CommandStack,
-            public view: DiagramView,
-            public directEdit: (command: DirectEdit) => Promise<string>) {}
-    
-    refresh(doRender: boolean) {
-        // if (doRender) {
-        //     this.view.render();
-        // } else {
-        //     this.view.update();
-        // }
-    }
+    constructor(public view: DiagramView) {}
 }
 
 export interface State {
@@ -78,12 +67,7 @@ export class ToolPressedAction implements State {
 
     mouseUp(event: Point): State {
         // TODO actions could also produce new state and not only commands
-        this.tool.action({
-            execute: (command: Command) => {
-                this.context.commandStack.execute(command);
-                this.context.refresh(true);
-            }
-        });
+        this.tool.action();
         return new IdleState(this.context);
     }
 
@@ -124,7 +108,7 @@ export class DragHandle implements State {
     }
 
     mouseUp(event: Point): State {
-        this.context.view.finishDragMessageHandle(this.context.commandStack);
+        this.context.view.finishDragMessageHandle();
         return new IdleState(this.context);
     }
 
@@ -142,7 +126,7 @@ export class StartDragMessage implements State {
     }
 
     mouseUp(event: Point): State {
-        this.context.view.selectMessage(this.message, this.context.directEdit);
+        this.context.view.selectMessage(this.message);
         return new IdleState(this.context);
     }
 
@@ -164,8 +148,8 @@ export class DragMessage implements State {
     }
 
     mouseUp(event: Point): State {
-        this.context.view.finishDragMessage(this.context.commandStack);
-        this.context.view.selectMessage(this.message, this.context.directEdit);
+        this.context.view.finishDragMessage();
+        this.context.view.selectMessage(this.message);
         return new IdleState(this.context);
     }
 
@@ -184,7 +168,7 @@ export class StartDragLifeLine implements State {
     }
 
     mouseUp(event: Point): State {
-        this.context.view.selectLifeLine(this.lifeLine, this.context.directEdit);
+        this.context.view.selectLifeLine(this.lifeLine);
         return new IdleState(this.context);
     }
 
@@ -206,8 +190,8 @@ export class DragLifeLine implements State {
     }
 
     mouseUp(event: Point): State {
-        this.context.view.finishDragLifeLine(this.context.commandStack);
-        this.context.view.selectLifeLine(this.lifeLine, this.context.directEdit);
+        this.context.view.finishDragLifeLine();
+        this.context.view.selectLifeLine(this.lifeLine);
         return new IdleState(this.context);
     }
 

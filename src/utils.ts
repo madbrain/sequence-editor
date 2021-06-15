@@ -14,3 +14,11 @@ export function defer<T>(): Defer<T> {
     deferred.promise = promise;
     return deferred;
 }
+
+export function makeMap<T>(l: Array<T>, idGetter: (T) => string): { [key: string]: T } {
+    const result = {};
+    l.forEach(e => {
+        result[idGetter(e)] = e;
+    });
+    return result;
+}

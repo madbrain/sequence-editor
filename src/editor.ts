@@ -107,10 +107,11 @@ class Editor {
 
         this.model = options.model;
 
-        this.view = new DiagramView(this.model, this.style, this.measurer, this.svg);
+        this.view = new DiagramView(this.model, this.style, this.measurer, this.svg,
+            directEdit => this.directEdit.start(directEdit),
+            this.commandStack);
 
-        const diagramContext = new DiagramContext(this.commandStack, this.view,
-                directEdit => this.directEdit.start(directEdit));
+        const diagramContext = new DiagramContext(this.view);
         
         this.state = new IdleState(diagramContext);
 
