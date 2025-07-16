@@ -1,4 +1,3 @@
-import { Command, CommandStack } from "./command";
 import { Point, Rectangle } from "./geometry";
 import { DiagramView, LifelineView, MessageHandle, MessageView, PlacedTool } from "./renderer";
 
