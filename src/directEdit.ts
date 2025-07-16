@@ -1,5 +1,6 @@
 import { Rectangle } from "./geometry";
-import { Defer, defer } from "./utils";
+import { defer } from "./utils";
+import type { Defer } from "./utils";
 
 export interface DirectEditCommand {
     value: string;
