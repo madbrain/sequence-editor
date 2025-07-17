@@ -1,34 +1,23 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { newSequenceEditor, Editor } from "./editor";
+  import { Editor } from "./editor";
   import Fa from "svelte-fa";
   import { faUndo, faRedo } from "@fortawesome/free-solid-svg-icons";
-  import { AddLifeLineCommand, createLifeLine, createModel } from "./model";
   import type { StackEvent } from "./command";
+  import type { DiagramType } from "./diagram";
 
-  let model = createModel();
+  export let diagramType: DiagramType;
+
   let container: HTMLElement;
   let editor: Editor;
   let paletteState: StackEvent = { canUndo: false, canRedo: false };
 
   onMount(() => {
-    editor = newSequenceEditor({ container, model });
+    editor = new Editor(diagramType, { container });
     editor.onStackChange((e) => {
       paletteState = e;
     });
   });
-
-  function undoAction() {
-    editor.undo();
-  }
-
-  function redoAction() {
-    editor.redo();
-  }
-
-  function addLifeLineAction() {
-    editor.executeCommand(new AddLifeLineCommand(model, createLifeLine()));
-  }
 </script>
 
 <div class="container">
@@ -38,20 +27,22 @@
       <li>
         <button
           disabled={!paletteState.canUndo}
-          on:click={undoAction}
+          on:click={() => editor.undo()}
           title="Undo"><Fa icon={faUndo} /></button
         >
       </li>
       <li>
         <button
           disabled={!paletteState.canRedo}
-          on:click={redoAction}
+          on:click={() => editor.redo()}
           title="Redo"><Fa icon={faRedo} /></button
         >
       </li>
-      <li class="spacer">
-        <button on:click={addLifeLineAction}>Add LifeLine</button>
-      </li>
+      {#each diagramType.actions as action}
+        <li class="spacer">
+          <button on:click={() => action.run(editor)}>{action.label}</button>
+        </li>
+      {/each}
     </ul>
   </div>
 </div>

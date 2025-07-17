@@ -1,7 +1,7 @@
 import { faTrashAlt, faEdit } from "@fortawesome/free-solid-svg-icons";
-import type { CommandExecuter } from "./command";
-import { CommandStack } from "./command";
-import { Point, Rectangle } from "./geometry";
+import type { CommandExecuter } from "../command";
+import { CommandStack } from "../command";
+import { Point, Rectangle } from "../geometry";
 import type { MessageModel, DiagramModel, LifeLineModel } from "./model";
 import {
   AddMessageCommand,
@@ -15,8 +15,9 @@ import {
   SetMessageFromCommand,
   SetMessageToCommand,
 } from "./model";
-import type { DirectEdit } from "./states";
-import { makeMap } from "./utils";
+import type { DirectEditCommand } from "../directEdit";
+import { makeMap } from "../utils";
+import type { Measurer, Tool, View } from "../editor";
 
 export interface Style {
   lifeLineHeadTextSize: string;
@@ -31,15 +32,6 @@ export interface Style {
   messageMargin: number;
 }
 
-export interface Measurer {
-  measure(text: string, textSize: string): any;
-}
-
-export interface Tool<T> {
-  icon: string;
-  action: (commandStack: CommandExecuter, context: T) => void;
-}
-
 type MessageContext = { diagram: DiagramView; message: MessageView };
 
 class EditMessageTool implements Tool<MessageContext> {
@@ -47,7 +39,7 @@ class EditMessageTool implements Tool<MessageContext> {
 
   action(commandStack: CommandExecuter, context: MessageContext) {
     const { diagram, message } = context;
-    const command: DirectEdit = {
+    const command: DirectEditCommand = {
       value: message.model.text,
       bounds: message.textBounds.expand(3),
     };
@@ -83,7 +75,7 @@ class EditLifeLineTool implements Tool<LifelineContext> {
 
   action(commandStack: CommandExecuter, context: LifelineContext) {
     const { diagram, lifeLine } = context;
-    const command: DirectEdit = {
+    const command: DirectEditCommand = {
       value: lifeLine.model.name,
       bounds: lifeLine.textBounds.expand(3),
     };
@@ -169,7 +161,7 @@ export class PlacedTool {
   }
 }
 
-export class DiagramView {
+export class DiagramView implements View {
   private messageStart = 0;
 
   private pendingDragMessage: PendingDragMessageView | null = null; // not displayed
@@ -191,7 +183,7 @@ export class DiagramView {
     private style: Style,
     private measurer: Measurer,
     private svg: any,
-    public directEdit: (command: DirectEdit) => Promise<string>,
+    public directEdit: (command: DirectEditCommand) => Promise<string>,
     public commandStack: CommandStack
   ) {
     this.shapesSvg = this.svg.add("g");
