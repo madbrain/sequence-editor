@@ -1,3 +1,4 @@
+import type { Svg } from "@svgdotjs/svg.js";
 import type { DiagramType } from "../diagram";
 import { Editor } from "../editor";
 import {
@@ -41,22 +42,18 @@ const diagram: DiagramType = {
       state: new IdleState(diagramContext),
     };
   },
-  initializeSvg: (svg: any) => {
+  initializeSvg: (svg: Svg) => {
     svg
-      .add("defs")
-      .add("marker")
+      .defs()
+      .marker(10, 10)
       .id("triangle")
-      .viewBox("0 0 10 10")
-      .refX("10")
-      .refY("5")
-      .markerUnits("strokeWidth")
-      .markerWidth("10")
-      .markerHeight("10")
+      .viewbox("0 0 10 10")
+      .ref(10, 5)
+      .attr("markerUnits", "strokeWidth")
       .orient("auto-start-reverse")
-      .add("path")
-      .d("M 0 0 L 10 5 L 0 10 z")
+      .path("M 0 0 L 10 5 L 0 10 z")
       .fill("black");
-    svg.add("style").content(`
+    svg.style().addText(`
         g.hide {
             visibility: hidden;
         }
