@@ -1,8 +1,9 @@
+import type { Svg } from "@svgdotjs/svg.js";
 import type { Editor, View } from "./editor";
 import type { State } from "./states";
 
 export interface DiagramType {
-  initializeSvg(svg: any): void;
+  initializeSvg(svg: Svg): void;
   initialize(editor: Editor): { model: any; view: View; state: State };
   actions: DiagramAction[];
 }

@@ -1,4 +1,4 @@
-import gySVG from "@graphery/svg";
+import { Svg, SVG } from "@svgdotjs/svg.js";
 import { CommandStack } from "./command";
 import type { Command, CommandExecuter, StackListener } from "./command";
 import { DirectEditController } from "./directEdit";
@@ -43,7 +43,7 @@ export class Editor {
   state: State;
   model: any;
   container: HTMLDivElement;
-  svg: any;
+  svg: Svg;
 
   constructor(diagramType: DiagramType, options: Options) {
     this.directEdit = new DirectEditController(options.container);
@@ -108,9 +108,8 @@ export class Editor {
     return container;
   }
 
-  private createSvg(container: HTMLDivElement, diagramType: DiagramType) {
-    const svg = gySVG().viewBox(0, 0, 100, 100);
-    svg.attachTo(container);
+  private createSvg(container: HTMLElement, diagramType: DiagramType): Svg {
+    const svg = SVG().addTo(container).viewbox(0, 0, 100, 100);
     diagramType.initializeSvg(svg);
 
     return svg;
@@ -119,7 +118,7 @@ export class Editor {
   private resizePage() {
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
-    this.svg.viewBox(0, 0, w, h).width(w).height(h);
+    this.svg.viewbox(0, 0, w, h).size(w, h);
   }
 }
 

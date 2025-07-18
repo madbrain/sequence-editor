@@ -1,4 +1,13 @@
 import { faTrashAlt, faEdit } from "@fortawesome/free-solid-svg-icons";
+import type {
+  Circle,
+  Element,
+  G,
+  Line,
+  Rect,
+  Svg,
+  Text,
+} from "@svgdotjs/svg.js";
 import type { CommandExecuter } from "../command";
 import { CommandStack } from "../command";
 import { Point, Rectangle } from "../geometry";
@@ -106,13 +115,13 @@ class DeleteLifeLineTool implements Tool<LifelineContext> {
 
 export class PlacedTool {
   hover = false;
-  svg: any;
+  svg!: G;
 
   constructor(
     public bounds: Rectangle,
     public tool: Tool<any>,
     public context: any,
-    private parentSvg: any,
+    private parentSvg: G,
     private commandStack: CommandStack
   ) {
     this.draw();
@@ -135,21 +144,18 @@ export class PlacedTool {
 
   private draw() {
     this.svg = this.parentSvg
-      .add("g")
-      .transform(`translate(${this.bounds.x},${this.bounds.y})`);
-    this.svg.el.classList.add("tool");
+      .group()
+      .transform({ translate: [this.bounds.x, this.bounds.y] });
+    this.svg.addClass("tool");
     this.svg
-      .add("rect")
-      .rx(5)
-      .ry(5)
-      .width(this.bounds.width)
-      .height(this.bounds.height)
+      .rect()
+      .radius(5, 5)
+      .size(this.bounds.width, this.bounds.height)
       .fill("white");
     this.svg
-      .add("g")
-      .transform("translate(4,3) scale(0.039)")
-      .add("path")
-      .d(this.tool.icon);
+      .group()
+      .transform({ translate: [4, 3], scale: 0.039 })
+      .path(this.tool.icon);
   }
 
   action() {
@@ -171,9 +177,9 @@ export class DiagramView implements View {
 
   tools: PlacedTool[] = [];
 
-  shapesSvg: any;
-  feedbackSvg: any;
-  toolsSvg: any;
+  shapesSvg: G;
+  feedbackSvg: G;
+  toolsSvg: G;
 
   lifeLines: LifelineView[] = [];
   messages: MessageView[] = [];
@@ -182,13 +188,13 @@ export class DiagramView implements View {
     public model: DiagramModel,
     private style: Style,
     private measurer: Measurer,
-    private svg: any,
+    private svg: Svg,
     public directEdit: (command: DirectEditCommand) => Promise<string>,
     public commandStack: CommandStack
   ) {
-    this.shapesSvg = this.svg.add("g");
-    this.feedbackSvg = this.svg.add("g");
-    this.toolsSvg = this.svg.add("g");
+    this.shapesSvg = this.svg.group();
+    this.feedbackSvg = this.svg.group();
+    this.toolsSvg = this.svg.group();
     this.render();
   }
 
@@ -535,15 +541,15 @@ export class DiagramView implements View {
 }
 
 export class StartMessageHandleView {
-  svg: any;
+  svg: Circle;
 
   constructor(
     public lifeLine: LifelineView,
     public position: Point,
-    parentSvg: any
+    parentSvg: G
   ) {
-    this.svg = parentSvg.add("circle").r(6);
-    (<HTMLElement>this.svg.el).classList.add("point-marker", "hover");
+    this.svg = parentSvg.circle().radius(6);
+    this.svg.addClass("point-marker").addClass("hover");
     this.update(position);
   }
 
@@ -562,16 +568,16 @@ export abstract class PendingMessageView {
   to: number;
   hoverOther: LifelineView | null = null;
 
-  private svg: any;
-  private lineSvg: any;
-  private circleSvg: any;
+  private svg!: G;
+  private lineSvg!: Line;
+  private circleSvg!: Circle;
 
   constructor(
     public y: number,
     movingPoint: number,
     protected lifeLine: LifelineView,
     private isMovingFrom: boolean,
-    parentSvg: any
+    parentSvg: G
   ) {
     if (isMovingFrom) {
       this.from = movingPoint;
@@ -604,8 +610,8 @@ export abstract class PendingMessageView {
 
   private addHover(lifeline: LifelineView) {
     if (!this.hoverOther) {
-      this.circleSvg = this.svg.add("circle").r(6);
-      this.circleSvg.el.classList.add("point-marker", "hover");
+      this.circleSvg = this.svg.circle().radius(6);
+      this.circleSvg.addClass("point-marker").addClass("hover");
     }
     this.hoverOther = lifeline;
   }
@@ -617,20 +623,18 @@ export abstract class PendingMessageView {
     }
   }
 
-  private draw(parentSvg: any) {
-    this.svg = parentSvg.add("g");
+  private draw(parentSvg: G) {
+    this.svg = parentSvg.group();
     this.lineSvg = this.svg
-      .add("line")
+      .line(0, this.y, 0, this.y)
       .fill("none")
       .stroke("black")
-      .marker_end("url(#triangle)")
-      .y1(this.y)
-      .y2(this.y);
+      .attr("marker-end", "url(#triangle)");
     this.update();
   }
 
   private update() {
-    this.lineSvg.x1(this.from).x2(this.to);
+    this.lineSvg.attr("x1", this.from).attr("x2", this.to);
     if (this.hoverOther) {
       this.circleSvg.cx(this.hoverOther.centerX()).cy(this.y);
     }
@@ -645,7 +649,7 @@ export abstract class PendingMessageView {
 }
 
 export class PendingExistingMessageView extends PendingMessageView {
-  constructor(private handle: MessageHandle, pos: number, parentSvg: any) {
+  constructor(private handle: MessageHandle, pos: number, parentSvg: G) {
     super(
       handle.message.y,
       pos,
@@ -685,7 +689,7 @@ export class PendingNewMessageView extends PendingMessageView {
     lifeLine: LifelineView,
     y: number,
     pos: number,
-    private parentSvg: any
+    parentSvg: G
   ) {
     super(y, pos, lifeLine, false, parentSvg);
   }
@@ -770,13 +774,13 @@ export class PendingLifeLineView {
   snap = false;
   position = -1;
 
-  private lineSvg: any;
+  private lineSvg!: Line;
 
   constructor(
     private diagram: DiagramView,
     private lifeLine: LifelineView,
     position: number,
-    parentSvg: any
+    parentSvg: G
   ) {
     this.x = position;
     this.y = this.lifeLine.y;
@@ -785,19 +789,16 @@ export class PendingLifeLineView {
     this.draw(parentSvg);
   }
 
-  private draw(parentSvg: any) {
-    this.lineSvg = parentSvg.add("line").stroke_dasharray(4);
+  private draw(parentSvg: G) {
+    this.lineSvg = parentSvg.line().stroke({ dasharray: "4" });
     this.update();
   }
 
   private update() {
-    this.lineSvg
-      .x1(this.x)
-      .y1(this.y)
-      .x2(this.x)
-      .y2(this.y + this.height)
-      .stroke_width(this.snap ? 3 : 1)
-      .stroke(this.snap ? "green" : "#55CCFF");
+    this.lineSvg.plot(this.x, this.y, this.x, this.y + this.height).stroke({
+      width: this.snap ? 3 : 1,
+      color: this.snap ? "green" : "#55CCFF",
+    });
   }
 
   updatePosition(x: number) {
@@ -856,10 +857,10 @@ export class PendingLifeLineView {
 const USED = 1;
 
 export class LifelineView {
-  flags: number;
+  flags: number = 0;
   text: TextView;
-  width: number;
-  headHeight: number;
+  width: number = 0;
+  headHeight: number = 0;
   lineHeight: number = 0;
   x: number = 0;
   y: number = 0;
@@ -871,18 +872,18 @@ export class LifelineView {
   textBounds: Rectangle; // derived
   textDy: number;
 
-  gSvg: any;
-  rectSvg: any;
-  textSvg: any;
-  lineSvg: any;
-  selectSvg: any;
+  gSvg!: G;
+  rectSvg!: Rect;
+  textSvg!: Text;
+  lineSvg!: Line;
+  selectSvg!: Rect;
 
   constructor(
     public model: LifeLineModel,
     public index: number,
     private style: Style,
     measurer: Measurer,
-    svg: any
+    svg: G
   ) {
     this.text = new TextView(
       this.model.name,
@@ -956,36 +957,35 @@ export class LifelineView {
     this.update();
   }
 
-  draw(svg) {
-    this.gSvg = svg.add("g");
-    this.rectSvg = this.gSvg.add("rect").stroke("black").fill("none");
-    this.textSvg = this.gSvg.add("text").text_anchor("middle");
-    this.lineSvg = this.gSvg.add("line").stroke_dasharray(4).stroke("black");
+  draw(svg: G) {
+    this.gSvg = svg.group();
+    this.rectSvg = this.gSvg.rect().stroke("black").fill("none");
+    this.textSvg = this.gSvg.plain("").font({ anchor: "middle" });
+    this.lineSvg = this.gSvg.line().stroke({ color: "black", dasharray: "4" });
     this.selectSvg = this.gSvg
-      .add("rect")
+      .rect()
       .x(-10)
       .y(-10)
-      .rx(10)
-      .ry(10)
+      .radius(10, 10)
       .fill("none")
-      .stroke_dasharray(4)
-      .stroke_width(2);
-    this.selectSvg.el.classList.add("select-marker");
+      .stroke({ width: 2, dasharray: "4" });
+    this.selectSvg.addClass("select-marker");
   }
 
   update() {
-    this.gSvg.transform(`translate(${this.x},${this.y})`);
+    this.gSvg.transform({ translate: [this.x, this.y] });
     this.rectSvg.width(this.width).height(this.headHeight);
-    this.textSvg
-      .dx(this.width / 2)
-      .dy(this.textDy)
-      .style.fontSize(this.text.size)
-      .content(this.text.value);
-    this.lineSvg
-      .x1(this.width / 2)
-      .y1(this.headHeight)
-      .x2(this.width / 2)
-      .y2(this.headHeight + this.lineHeight);
+    this.textSvg.font({ size: this.text.size }).text((t) => {
+      t.tspan(this.text.value)
+        .dx(this.width / 2)
+        .dy(this.textDy);
+    });
+    this.lineSvg.plot(
+      this.width / 2,
+      this.headHeight,
+      this.width / 2,
+      this.headHeight + this.lineHeight
+    );
     this.selectSvg
       .width(this.markerBounds.width)
       .height(this.markerBounds.height);
@@ -1004,11 +1004,15 @@ export class LifelineView {
 }
 
 // TODO move to utils
-function updateClass(svgElement: any, condition: boolean, className: string) {
+function updateClass(
+  svgElement: Element,
+  condition: boolean,
+  className: string
+) {
   if (condition) {
-    svgElement.el.classList.add(className);
+    svgElement.addClass(className);
   } else {
-    svgElement.el.classList.remove(className);
+    svgElement.removeClass(className);
   }
 }
 
@@ -1019,20 +1023,20 @@ export class MessageView {
   to: MessageHandle;
   reversed: boolean = false;
   text: TextView;
-  width: number;
-  height: number;
+  width: number = 0;
+  height: number = 0;
   hover: boolean = false;
-  markerBounds: Rectangle = null;
+  markerBounds: Rectangle;
   textBounds: Rectangle;
   y: number = 0;
   editing = false;
 
-  gSvg: any;
-  lineSvg: any;
-  textSvg: any;
-  startCircleSvg: any;
-  endCircleSvg: any;
-  selectSvg: any;
+  gSvg!: G;
+  lineSvg!: Line;
+  textSvg!: Text;
+  startCircleSvg!: Circle;
+  endCircleSvg!: Circle;
+  selectSvg!: Rect;
 
   constructor(
     public model: MessageModel,
@@ -1041,7 +1045,7 @@ export class MessageView {
     public selected: boolean,
     private style: Style,
     measurer: Measurer,
-    svg: any
+    svg: G
   ) {
     this.from = new MessageHandle(from, this);
     this.to = new MessageHandle(to, this);
@@ -1127,49 +1131,48 @@ export class MessageView {
     this.update();
   }
 
-  draw(svg) {
-    this.gSvg = svg.add("g");
+  draw(svg: G) {
+    this.gSvg = svg.group();
     this.lineSvg = this.gSvg
-      .add("line")
+      .line()
       .stroke("black")
-      .marker_end("url(#triangle)");
-    this.textSvg = this.gSvg.add("text");
-    this.startCircleSvg = this.gSvg.add("circle").r(6);
-    this.startCircleSvg.el.classList.add("point-marker");
-    this.endCircleSvg = this.gSvg.add("circle").r(6);
-    this.endCircleSvg.el.classList.add("point-marker");
+      .attr("marker-end", "url(#triangle)");
+    this.textSvg = this.gSvg.plain("");
+    this.startCircleSvg = this.gSvg.circle().radius(6);
+    this.startCircleSvg.addClass("point-marker");
+    this.endCircleSvg = this.gSvg.circle().radius(6);
+    this.endCircleSvg.addClass("point-marker");
     this.selectSvg = this.gSvg
-      .add("rect")
-      .rx(10)
-      .ry(10)
+      .rect()
+      .radius(10, 10)
       .fill("none")
-      .stroke_dasharray(4)
-      .stroke_width(2);
-    this.selectSvg.el.classList.add("select-marker");
+      .stroke({ width: 2, dasharray: "4" });
+    this.selectSvg.addClass("select-marker");
   }
 
   update() {
     if (this.editing) {
-      this.gSvg.el.classList.add("hide");
+      this.gSvg.addClass("hide");
     } else {
-      this.gSvg.el.classList.remove("hide");
-      this.lineSvg
-        .x1(this.from.lifeLine.centerX())
-        .y1(this.y)
-        .x2(this.to.lifeLine.centerX())
-        .y2(this.y);
+      this.gSvg.removeClass("hide");
+      this.lineSvg.plot(
+        this.from.lifeLine.centerX(),
+        this.y,
+        this.to.lifeLine.centerX(),
+        this.y
+      );
       this.textSvg
-        .y(this.y - 7)
-        .style.fontSize(this.text.size)
-        .content(this.text.value);
+        .ay((this.y - 7) as any) // TODO ax() and ay() only accept string
+        .font({ size: this.text.size })
+        .plain(this.text.value);
       if (this.reversed) {
         this.textSvg
-          .x(this.to.lifeLine.centerX() + this.style.messageMargin)
-          .text_anchor("start");
+          .ax((this.to.lifeLine.centerX() + this.style.messageMargin) as any)
+          .font({ anchor: "start" });
       } else {
         this.textSvg
-          .x(this.to.lifeLine.centerX() - this.style.messageMargin)
-          .text_anchor("end");
+          .ax((this.to.lifeLine.centerX() - this.style.messageMargin) as any)
+          .font({ anchor: "end" });
       }
       this.startCircleSvg.cx(this.from.center().x).cy(this.from.center().y);
       this.endCircleSvg.cx(this.to.center().x).cy(this.to.center().y);
@@ -1206,10 +1209,10 @@ export enum TextAlign {
 }
 
 export class TextView {
-  value: string;
-  width: number;
-  height: number;
-  ascent: number;
+  value!: string;
+  width!: number;
+  height!: number;
+  ascent!: number;
 
   constructor(
     value: string,

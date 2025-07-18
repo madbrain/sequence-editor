@@ -13,7 +13,7 @@
   "license": "ISC",
   "dependencies": {
     "@fortawesome/free-solid-svg-icons": "^5.15.3",
-    "@graphery/svg": "^0.1.5",
+    "@svgdotjs/svg.js": "^3.2.4",
     "svelte-fa": "^2.2.0"
   },
   "devDependencies": {
