@@ -1,4 +1,4 @@
-import type { Command } from "./command";
+import type { Command } from "../command";
 
 export interface DiagramModel {
   lifeLines: LifeLineModel[];
@@ -248,17 +248,6 @@ export function createModel(): DiagramModel {
   };
 }
 
-export function createRandomModel(): DiagramModel {
-  const lifeLines = new Array(5).fill(0).map((x) => createRandomLifeLine());
-  const messages = new Array(7)
-    .fill(0)
-    .map((x) => createRandomMessage(lifeLines));
-  return {
-    lifeLines,
-    messages,
-  };
-}
-
 export function createLifeLine(name: string = "actor"): LifeLineModel {
   return {
     id: `L${id++}`,
@@ -277,45 +266,4 @@ export function createMessage(
     to,
     text,
   };
-}
-
-function createRandomLifeLine(): LifeLineModel {
-  return {
-    id: `L${id++}`,
-    name: randomText(4),
-  };
-}
-
-function createRandomMessage(lifeLines: LifeLineModel[]): MessageModel {
-  const from = choice(lifeLines);
-  const to = choiceNot(from, lifeLines);
-  return {
-    id: `M${id++}`,
-    from,
-    to,
-    text: randomText(),
-  };
-}
-
-function randomText(size: number = 10) {
-  const pieces = ["mo", "bi", "sha", "doo", "fli", "re", "po", "gra"];
-  let result = "";
-  const length = 2 + Math.floor(Math.random() * size);
-  for (let i = 0; i < length; ++i) {
-    result += choice(pieces);
-  }
-  return result;
-}
-
-function choiceNot<T>(e: T, list: T[]) {
-  while (true) {
-    const x = choice(list);
-    if (x != e) {
-      return x;
-    }
-  }
-}
-
-function choice<T>(list: T[]): T {
-  return list[Math.floor(Math.random() * list.length)];
 }

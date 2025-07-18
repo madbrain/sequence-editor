@@ -1,13 +1,14 @@
 <script>
-    import Editor from "./Editor.svelte";
+  import Editor from "./Editor.svelte";
+  import diagramType from "./sequence/diagram";
 </script>
 
-<Editor />
+<Editor {diagramType} />
 
 <style>
-    :global(html, body) {
-        height: 100%;
-        margin: 0;
-        padding: 0;
-    }
+  :global(html, body) {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
 </style>
