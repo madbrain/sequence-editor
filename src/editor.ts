@@ -49,8 +49,8 @@ export class Editor {
     this.directEdit = new DirectEditController(options.container);
 
     this.container = this.createContainer(options.container);
-    window.addEventListener("resize", (e) => this.resizePage());
     this.svg = this.createSvg(this.container, diagramType);
+    window.addEventListener("resize", (e) => this.resizePage());
 
     const { model, view, state } = diagramType.initialize(this);
     this.model = model;

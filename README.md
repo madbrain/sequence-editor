@@ -29,4 +29,5 @@ de conception d'éditeur visuel.
 
 # TODO
 
-- remplacer gySVG par https://svgjs.dev
+- [ ] Start a new diagram type
+- [ ] Experiment with "a la Svelte" dynamic template generator

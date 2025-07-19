@@ -173,6 +173,7 @@ export class DiagramView implements View {
   private pendingDragMessage: PendingDragMessageView | null = null; // not displayed
   private pendingMessage: PendingMessageView | null = null;
   private pendingLifeLine: PendingLifeLineView | null = null;
+  private lifeLineMap: { [key: string]: LifelineView } = {};
   startMessageHandle: StartMessageHandleView | null = null;
 
   tools: PlacedTool[] = [];
@@ -201,12 +202,12 @@ export class DiagramView implements View {
   public render() {
     this.lifeLines.forEach((l) => l.clearFlags());
     const oldLifelines = makeMap(this.lifeLines, (l) => l.model.id);
-    this.lifeLines = this.model.lifeLines.map((lifeLine, i) => {
-      const oldLifeLine = oldLifelines[lifeLine.id];
+    this.lifeLines = this.model.lifeLines.map((lifeLineModel, i) => {
+      const oldLifeLine = oldLifelines[lifeLineModel.id];
       const newLifeLine =
         oldLifeLine != null
           ? oldLifeLine.updateIndex(i)
-          : this.createLifeline(lifeLine, i);
+          : this.createLifeline(lifeLineModel, i);
       newLifeLine.setUsed();
       return newLifeLine;
     });
@@ -216,15 +217,15 @@ export class DiagramView implements View {
         lifeLine.remove();
       }
     }
-    const lifeLineMap = makeMap(this.lifeLines, (l) => l.model.id);
+    this.lifeLineMap = makeMap(this.lifeLines, (l) => l.model.id);
     this.messages.forEach((m) => m.clearFlags());
     const oldMessageMap = makeMap(this.messages, (m) => m.model.id);
-    this.messages = this.model.messages.map((message) => {
-      const oldMessage = oldMessageMap[message.id];
+    this.messages = this.model.messages.map((messageModel) => {
+      const oldMessage = oldMessageMap[messageModel.id];
       const newMessage =
         oldMessage != null
           ? oldMessage
-          : this.createMessage(message, lifeLineMap);
+          : this.createMessage(messageModel, this.lifeLineMap);
       newMessage.setUsed();
       return newMessage;
     });
@@ -253,8 +254,7 @@ export class DiagramView implements View {
   ): MessageView {
     return new MessageView(
       message,
-      lifeLineMap[message.from.id],
-      lifeLineMap[message.to.id],
+      lifeLineMap,
       false,
       this.style,
       this.measurer,
@@ -419,7 +419,9 @@ export class DiagramView implements View {
 
   layout() {
     this.lifeLines.forEach((lifeLine) => lifeLine.measureText());
-    this.messages.forEach((message) => message.measureText());
+    this.messages.forEach((message) => {
+      message.updateEndpoints(this.lifeLineMap).measureText();
+    });
 
     this.messageStart = 0;
 
@@ -1019,8 +1021,8 @@ function updateClass(
 export class MessageView {
   flags: number = 0;
 
-  from: MessageHandle;
-  to: MessageHandle;
+  from!: MessageHandle;
+  to!: MessageHandle;
   reversed: boolean = false;
   text: TextView;
   width: number = 0;
@@ -1040,15 +1042,13 @@ export class MessageView {
 
   constructor(
     public model: MessageModel,
-    from: LifelineView,
-    to: LifelineView,
+    lifeLineMap: { [key: string]: LifelineView },
     public selected: boolean,
     private style: Style,
     measurer: Measurer,
     svg: G
   ) {
-    this.from = new MessageHandle(from, this);
-    this.to = new MessageHandle(to, this);
+    this.updateEndpoints(lifeLineMap);
     this.text = new TextView(
       this.model.text,
       this.style.messageTextSize,
@@ -1056,6 +1056,12 @@ export class MessageView {
       measurer
     );
     this.draw(svg);
+  }
+
+  updateEndpoints(lifeLineMap: { [key: string]: LifelineView }) {
+    this.from = new MessageHandle(lifeLineMap[this.model.from.id], this);
+    this.to = new MessageHandle(lifeLineMap[this.model.to.id], this);
+    return this;
   }
 
   clearFlags() {
