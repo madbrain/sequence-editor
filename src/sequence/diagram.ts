@@ -4,7 +4,7 @@ import { Editor } from "../editor";
 import {
   AddLifeLineCommand,
   createLifeLine,
-  createModel,
+  createInitialModel,
   type DiagramModel,
 } from "./model";
 import { createRandomModel } from "./random";
@@ -26,7 +26,7 @@ const DEFAULT_STYLE: Style = {
 
 const diagram: DiagramType = {
   initialize: (editor: Editor) => {
-    const model = createModel();
+    const model = createInitialModel();
     const view = new DiagramView(
       model,
       DEFAULT_STYLE,

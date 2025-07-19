@@ -237,7 +237,7 @@ export class DeleteLifeLineCommand implements Command {
 
 let id = 0;
 
-export function createModel(): DiagramModel {
+export function createInitialModel(): DiagramModel {
   const lifeLines = [createLifeLine("Roméo"), createLifeLine("Juliette")];
   return {
     lifeLines,
