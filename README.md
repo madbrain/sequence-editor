@@ -1,33 +1,55 @@
 # Sequence Diagram Editor
 
-Éditeur de diagrammes de séquences minimaliste. Prétexte pour la définition d'une méthodologie
-de conception d'éditeur visuel.
+Tutorial to build a minimalist sequence diagram editor.
 
-# Méthodologie
+![Architecture](docs/Architecture.png)
 
-## Affichage
+# Steps
 
-- faire en sorte de que le svg est la taille de sa div parente
-- écrire le svg en statique de ce que l'on veut réaliser
-- concevoir un modèle d'entré de ce que l'on veut représenter
-  - liste ordonée de nom de lifelines et message nommé (origin, dest)
-  - pour le tester création randomiser de ce modèle
-- transformer ce modèle en modèle graphique (correspond à la dynamisation du SVG statique)
-- appliquer un layout au modèle graphique => définir les constantes de style
-  - utiliser un canvas pour mesurer le texte
-  - property based testing : les entêtes ne doivent pas se superposer et les messages contenus entre les lignes source et destination
+## Scaffold project
 
-## Gestion des événements
+Create a vanilla web/Typescript project:
 
-- intercepter les événements et trouver l'élément concerné
-- ajouter au modèle de vue la présentation de la sélection/hover/points d'interraction
-  - lifeline (hover the head)
-  - message
-  - points de contact des messages
-- Ajouter un automate pour la gestion des événements
-- Ajouter une pile de commandes pour les modifications
+```
+npm create vite@latest sequence-editor --template vanilla-ts
+```
 
-# TODO
+Add [svg.js](https://svgjs.dev) dependency:
 
-- [ ] Start a new diagram type
-- [ ] Experiment with "a la Svelte" dynamic template generator
+```
+cd sequence-editor
+npm install @svgdotjs/svg.js
+```
+
+## Display
+
+- Experiment with displaying SVG content with svg.js
+- Make SVG canvas to use all screen space
+- introduce the model and the view
+  - first lifelines:
+    - model: ordered list of named actors
+    - write a static view for this model
+    - how big is the head of the lifeline: measuring text
+    - how to space out every elements: first simple layout
+  - extract style constants
+  - continue with messages: split in multiple views
+    - model: ordered list of message from a lifeline to an other
+    - display horizontal messages
+    - long message texts can break the layout
+    - tips: for testing, create a randomized model
+  - property based testing of the layout:
+    - lifeline headers must not overlap
+    - message text must entirely between start and end lifeline
+
+## Events Handling
+
+- Intercept mouse events and identify concerned sub-view
+- Modify views to support extra information: hover/selection/interaction points/tools
+- Use layers to stack SVG elements
+- Add state-machine to handle complex event sequence
+- Add commands to handle model mutation
+- Add a command stack to store and execute commands
+
+## Palette
+
+- show a palette with undo/redo and global actions
